@@ -4,4 +4,14 @@ project(ZenbookFanContrel VERSION 1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDART_REQUIRED ON)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+add_compile_options(-Wall -Wextra -Wpedantic)
+
+include_directories(daemon/include)
+
+add_executable(zenbook-fan-daemon
+    daemon/src/main.cpp
+    daemon/src/fan_controller.cpp
+)
+
+find_package(Threads REQUIRED)
+target_link_libraries(zenbook-fan-daemon PRIVATE Threads::Threads)
