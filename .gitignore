@@ -1,4 +1,10 @@
 build/
 bin/
 
+*.dsl
+*.dat
+*.bin
+*.ko
+*.o
+
 .vscode
