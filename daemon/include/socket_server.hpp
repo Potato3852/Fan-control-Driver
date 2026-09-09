@@ -9,6 +9,7 @@
 #include <atomic>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <cstring>
 
@@ -78,6 +79,8 @@ private:
             ::close(server_fd_);
             throw std::runtime_error(std::format("Failed to bind socket to path: {}", socket_path_.string()));
         }
+
+        ::chmod(socket_path_.c_str(), 0666);
 
         if (::listen(server_fd_, 5) == -1) {
             ::close(server_fd_);
