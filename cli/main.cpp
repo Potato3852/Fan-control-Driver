@@ -6,24 +6,47 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <cstring>
+#include <cstdlib>
+#include <filesystem>
+
+namespace fs = std::filesystem;
+
+bool is_notify_enabled_in_config() {
+    const char* home = std::getenv("HOME");
+    if (!home) return false;
+    fs::path config_path = fs::path(home) / ".config" / "zenbook-fan" / "notify";
+    return fs::exists(config_path);
+}
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        std::cerr << "Usage: fan-cli <get|set|toggle> [mode]\n";
+        std::cerr << "Usage: fan-cli [-n|--notify] <get|set|toggle> [mode]\n";
         return 1;
     }
 
-    std::string_view command = argv[1];
+    bool enable_notify = is_notify_enabled_in_config();
+    int arg_offset = 1;
+
+    if (std::string_view(argv[1]) == "-n" || std::string_view(argv[1]) == "--notify") {
+        enable_notify = true;
+        arg_offset++;
+        if (argc < 3) {
+            std::cerr << "Usage: fan-cli [-n|--notify] <get|set|toggle> [mode]\n";
+            return 1;
+        }
+    }
+
+    std::string_view command = argv[arg_offset];
     std::string request;
 
     if (command == "get") {
         request = "GET";
     } else if (command == "set") {
-        if (argc < 3) {
+        if (argc < arg_offset + 2) {
             std::cerr << "Error: 'set' requires a mode argument (0, 1, or 2)\n";
             return 1;
         }
-        request = std::format("SET {}", argv[2]);
+        request = std::format("SET {}", argv[arg_offset + 1]);
     } else if (command == "toggle") {
         request = "TOGGLE";
     } else {
@@ -42,8 +65,9 @@ int main(int argc, char* argv[]) {
     addr.sun_family = AF_UNIX;
     std::strncpy(addr.sun_path, "/run/zenbook_fan.sock", sizeof(addr.sun_path) - 1);
 
-    if(::connect(client_fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == -1) {
+    if (::connect(client_fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == -1) {
         std::cerr << "Error: connection to daemon failed.\n";
+        ::close(client_fd);
         return 1;
     }
 
@@ -53,10 +77,21 @@ int main(int argc, char* argv[]) {
     ssize_t bytes_read = ::read(client_fd, buffer, sizeof(buffer) - 1);
 
     if (bytes_read > 0) {
-        std::cout << buffer;
+        std::string response(buffer, bytes_read);
+        std::cout << response;
+
+        if (enable_notify) {
+            if (!response.empty() && response.back() == '\n') {
+                response.pop_back();
+            }
+            std::string notify_cmd = std::format(
+                "notify-send -u low -i fan -t 2000 \"Thermal Profile\" \"{}\" 2>/dev/null", 
+                response
+            );
+            ::system(notify_cmd.c_str());
+        }
     }
 
     ::close(client_fd);
-
     return 0;
 }

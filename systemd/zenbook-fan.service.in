@@ -5,7 +5,7 @@ After=multi-user.target
 [Service]
 Type=simple
 ExecStart=@CMAKE_INSTALL_PREFIX@/bin/zenbook-fan-daemon 
-Restart=alwayste
+Restart=always
 RestartSec=2s
 
 [Install]
