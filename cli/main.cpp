@@ -11,6 +11,10 @@
 
 namespace fs = std::filesystem;
 
+/**
+ * @brief Helper function for detecting the on/off state of notifications.
+ * @return 1 - notifications enabled, 0 - notification disabled
+ */
 bool is_notify_enabled_in_config() {
     const char* home = std::getenv("HOME");
     if (!home) return false;
@@ -19,6 +23,7 @@ bool is_notify_enabled_in_config() {
 }
 
 int main(int argc, char* argv[]) {
+    // Verification of the correctness of the arguments
     if (argc < 2) {
         std::cerr << "Usage: fan-cli [-n|--notify] <get|set|toggle> [mode]\n";
         return 1;
@@ -39,6 +44,7 @@ int main(int argc, char* argv[]) {
     std::string_view command = argv[arg_offset];
     std::string request;
 
+    // Determining the type of command
     if (command == "get") {
         request = "GET";
     } else if (command == "set") {
@@ -54,6 +60,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    // Create socket between the CLI and the daemon.
     int client_fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
 
     if (client_fd == -1) {
@@ -65,6 +72,7 @@ int main(int argc, char* argv[]) {
     addr.sun_family = AF_UNIX;
     std::strncpy(addr.sun_path, "/run/zenbook_fan.sock", sizeof(addr.sun_path) - 1);
 
+    // Connect to daemon
     if (::connect(client_fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == -1) {
         std::cerr << "Error: connection to daemon failed.\n";
         ::close(client_fd);
@@ -76,6 +84,7 @@ int main(int argc, char* argv[]) {
     char buffer[128]{0};
     ssize_t bytes_read = ::read(client_fd, buffer, sizeof(buffer) - 1);
 
+    // Determining the response
     if (bytes_read > 0) {
         std::string response(buffer, bytes_read);
         std::cout << response;
@@ -92,6 +101,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // Close connection
     ::close(client_fd);
     return 0;
 }

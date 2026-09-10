@@ -16,7 +16,14 @@
 namespace fs = std::filesystem;
 
 namespace zenbook::ipc {
-    
+
+/**
+ * @brief Parse an incoming IPC command string and dispatch it to the controller.
+ * @tparam Controller Fan controller type.
+ * @param req Request command string (GET, SET <mode>, TOGGLE).
+ * @param controller Reference to the fan controller instance.
+ * @return Response string to be sent back to the client.
+ */
 template <typename Controller>
 std::string process_command(std::string_view req, Controller& controller) {
     try {
@@ -53,6 +60,9 @@ std::string process_command(std::string_view req, Controller& controller) {
     return "ERR: Unknown command\n";
 }
 
+/**
+ * @brief Asynchronous UNIX domain socket server handling daemon IPC requests.
+ */
 template <typename Controller>
 class SocketServer {
 private:
@@ -62,6 +72,7 @@ private:
     std::jthread worker_;
 
     void init_socket() {
+        // Remove stale socket file left from previous unexpected shutdowns
         if (fs::exists(socket_path_)) {
             fs::remove(socket_path_);
         }
@@ -80,6 +91,7 @@ private:
             throw std::runtime_error(std::format("Failed to bind socket to path: {}", socket_path_.string()));
         }
 
+        // Set permissions to 0666 so unprivileged CLI/Hyprland clients can communicate
         ::chmod(socket_path_.c_str(), 0666);
 
         if (::listen(server_fd_, 5) == -1) {
@@ -89,6 +101,7 @@ private:
     }
 
     void run(std::stop_token stop_token) {
+        // Set 500ms receive timeout to allow worker thread to check stop_token periodically
         timeval tv{.tv_sec = 0, .tv_usec = 500'000};
         ::setsockopt(server_fd_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
@@ -113,6 +126,11 @@ private:
     }
 
 public:
+    /**
+     * @brief Construct and start the UNIX domain socket server.
+     * @param controller Reference to the fan controller instance.
+     * @param socket_path Path where the socket file will be bound.
+     */
     SocketServer(Controller& controller, fs::path socket_path = "/run/zenbook_fan.sock") : controller_(controller), socket_path_(std::move(socket_path)) {
         init_socket();
         worker_ = std::jthread([this](std::stop_token st) { run(st); });

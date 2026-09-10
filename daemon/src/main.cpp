@@ -6,6 +6,7 @@
 #include <mutex>
 
 namespace {
+    // Graceful shutdown mechanism triggered by POSIX signals (SIGINT / SIGTERM)
     std::condition_variable shutdown_cv;
     std::mutex shutdown_mutex;
     bool shutdown_requested = false;
@@ -30,6 +31,7 @@ int main() {
 
         std::cout << "[zenbook-fan-daemon] Service started.\n";
 
+        // Block main thread until OS shutdown signal is received
         std::unique_lock<std::mutex> lock(shutdown_mutex);
         shutdown_cv.wait(lock, [] { return shutdown_requested; });
 
